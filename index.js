@@ -440,30 +440,31 @@ function getDefaultContent() {
   return {
     type: "main",
     hero: {
-      eyebrow: "Authentic skincare for Bangladesh",
-      title: "Feel the",
-      titleItalic: "pure softness.",
+      eyebrow: "Global Cosmetics Lines - care made close to home",
+      title: "Care that feels",
+      titleItalic: "quietly certain.",
       description:
-        "SoftyyBD brings premium skincare and cosmetics with strict quality control, authentic sourcing, and formulas designed for everyday confidence.",
-      primaryBtn: "Explore the Portfolio",
-      secondaryBtn: "Meet Softyy",
+        "A cleaner, warmer storefront for everyday skincare - easy to scan, easy to trust, and designed around the way real customers browse.",
+      primaryBtn: "Explore the collection",
+      secondaryBtn: "Our Story",
       image: "/products/softyy/cover.jpg",
       floatingCard: {
-        small: "Quality Promise",
-        title: "Lab-guided care",
-        desc: "Authentic products. Thoughtful formulas.",
+        small: "Customer Focus",
+        title: "Oil control, without the noise.",
+        desc: "Simple guidance, clear product intent.",
         image: "/brand/softyy-logo.png",
       },
       stats: [
-        { label: "100%", sublabel: "Authentic products" },
-        { label: "R&D", sublabel: "In-house quality team" },
-        { label: "BD-wide", sublabel: "Reliable delivery" },
+        { label: "Everyday-first formulas", sublabel: "" },
+        { label: "Careful product curation", sublabel: "" },
+        { label: "Support you can reach", sublabel: "" },
       ],
     },
     marquee: {
       items: [
         "Feel The Pure Softness",
-        "SoftyyBD",
+        "Global Cosmetics Lines",
+        "Softyy",
         "Fresh Daily Confidence",
         "Authentic Skincare",
         "Quality You Can Trust",
@@ -476,7 +477,7 @@ function getDefaultContent() {
       description:
         "We combine accessible pricing, careful sourcing, and active formulation standards so daily self-care feels transparent from first click to final application.",
       quote:
-        "Softyy is built for customers who want beauty products they can trust on their skin and in their routine.",
+        "Global Cosmetics Lines is built for customers who want beauty products they can trust on their skin and in their routine.",
       stats: [
         { number: "01", label: "Authentic sourcing" },
         { number: "02", label: "Lab-led quality" },
@@ -486,9 +487,9 @@ function getDefaultContent() {
     },
     story: {
       eyebrow: "The brand story",
-      title: "A skincare house built around trust.",
+      title: "Global Cosmetics Lines, built around trust.",
       description:
-        "SoftyyBD is created by Global Cosmetics Line's to make authentic skincare and cosmetics easier to discover, safer to buy, and more enjoyable to use across Bangladesh.",
+        "Global Cosmetics Lines makes authentic skincare, cosmetics, personal care, and freshness essentials easier to discover, safer to buy, and more enjoyable to use across Bangladesh.",
       items: [
         {
           icon: "shield",
@@ -503,28 +504,28 @@ function getDefaultContent() {
         {
           icon: "heart",
           title: "Trust in every step",
-          desc: "From product details to delivery support, SoftyyBD is designed to feel clear and dependable.",
+          desc: "From product details to delivery support, Global Cosmetics Lines is designed to feel clear and dependable.",
         },
       ],
-      ctaBtn: "Partner with Softyy",
+      ctaBtn: "Partner with GCL",
     },
     testimonial: {
       stars: 5,
       quote:
         "A beauty and skincare brand portfolio grounded in authenticity, accessible luxury, and customer confidence.",
-      person: "SOFTYYBD BRAND DIRECTION",
+      person: "GLOBAL COSMETICS LINES",
       role: "Brand Portfolio Statement",
     },
     cta: {
       eyebrow: "Business & partnerships",
       title: "Let's build a more trusted beauty routine.",
       description:
-        "For distribution, retail, collaborations, press, and business partnerships, connect with the SoftyyBD team.",
+        "For distribution, retail, collaborations, press, and business partnerships, connect with the Global Cosmetics Lines team.",
       email: "globalcosmeticslines@gmail.com",
     },
     footer: {
       description:
-        "Authentic skincare and cosmetics for healthy, refreshed skin. Feel The Pure Softness.",
+        "The beauty house behind Softyy skincare and Fresh Daily essentials. Feel The Pure Softness.",
       columns: [
         {
           title: "Discover",
@@ -551,17 +552,18 @@ function getDefaultContent() {
           ],
         },
       ],
-      copyright: "2026 Global Cosmetics Line's. All rights reserved.",
+      copyright: "2026 Global Cosmetics Lines. All rights reserved.",
       tagline: "Feel The Pure Softness.",
     },
     navbar: {
-      brandName: "SOFTYY",
-      brandInitial: "S",
+      brandName: "Global Cosmetics Lines",
+      brandInitial: "G",
+      logo: "/brand/gcl-main-logo.png",
       links: [
         { text: "Collection", href: "/collection" },
-        { text: "Our Story", href: "/story" },
+        { text: "Our brands", href: "/brands" },
         { text: "Philosophy", href: "/philosophy" },
-        { text: "Contact", href: "/contact" },
+        { text: "Our Story", href: "/story" },
       ],
       ctaBtn: "Explore Beauty",
     },
