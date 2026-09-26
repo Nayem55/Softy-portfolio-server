@@ -8,6 +8,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const multer = require("multer");
 const cloudinary = require("cloudinary").v2;
+const sharp = require("sharp");
 try {
   require("dotenv").config();
 } catch (e) {}
@@ -197,6 +198,18 @@ app.put("/api/content", authMiddleware, async (req, res) => {
 
 // ─── Upload ─────────────────────────────────────────────────────────────────
 
+const optimizeCloudinaryImage = async (file) => {
+  const levels = [[1000, 76], [900, 66], [800, 60], [700, 55], [600, 50], [480, 45]];
+  let output;
+  for (const [size, quality] of levels) {
+    output = await sharp(file.buffer, { animated: false }).rotate()
+      .resize({ width: size, height: size, fit: "inside", withoutEnlargement: true })
+      .webp({ quality, effort: 6, smartSubsample: true }).toBuffer();
+    if (output.length <= 100 * 1024) return output;
+  }
+  return output;
+};
+
 app.post("/api/upload", authMiddleware, upload.single("image"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
@@ -206,9 +219,10 @@ app.post("/api/upload", authMiddleware, upload.single("image"), async (req, res)
     const cloudName = integration.cloudName || process.env.CLOUDINARY_CLOUD_NAME;
     if (integration.enabled && cloudName && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET && cloudName !== "demo") {
       cloudinary.config({ cloud_name: cloudName, api_key: process.env.CLOUDINARY_API_KEY, api_secret: process.env.CLOUDINARY_API_SECRET });
-      const options = { folder: integration.folder || "softy-portfolio", resource_type: "image" };
+      const optimizedBuffer = await optimizeCloudinaryImage(req.file);
+      const options = { folder: integration.folder || "softy-portfolio", resource_type: "image", format: "webp" };
       if (integration.uploadPreset) options.upload_preset = integration.uploadPreset;
-      const result = await new Promise((resolve, reject) => { const stream = cloudinary.uploader.upload_stream(options, (error, value) => error ? reject(error) : resolve(value)); stream.end(req.file.buffer); });
+      const result = await new Promise((resolve, reject) => { const stream = cloudinary.uploader.upload_stream(options, (error, value) => error ? reject(error) : resolve(value)); stream.end(optimizedBuffer); });
       return res.json({ url: result.secure_url, publicId: result.public_id });
     }
     const base64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
