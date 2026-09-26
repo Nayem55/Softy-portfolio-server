@@ -7,6 +7,7 @@ const { MongoClient, ObjectId } = require("mongodb");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const multer = require("multer");
+const cloudinary = require("cloudinary").v2;
 try {
   require("dotenv").config();
 } catch (e) {}
@@ -15,7 +16,7 @@ const app = express();
 const JWT_SECRET = process.env.JWT_SECRET || "adornica-secret-key-2026";
 const MONGO_URI =
   process.env.MONGO_URI ||
-  "mongodb+srv://adornica-portfolio:adornica-portfolio@adornica-portfolio.ldmoler.mongodb.net/?appName=Adornica-portfolio";
+  "mongodb://192.168.0.59:27017/softy-portfolio";
 
 let cachedClient = null;
 let cachedDb = null;
@@ -25,7 +26,7 @@ async function connectDB() {
   const client = new MongoClient(MONGO_URI);
   await client.connect();
   cachedClient = client;
-  cachedDb = client.db("adornica-portfolio");
+  cachedDb = client.db("softy-portfolio");
   await cachedDb.collection("admins").createIndex({ username: 1 }, { unique: true });
   await cachedDb.collection("products").createIndex({ order: 1 });
   await cachedDb.collection("brands").createIndex({ slug: 1 }, { unique: true });
@@ -196,9 +197,20 @@ app.put("/api/content", authMiddleware, async (req, res) => {
 
 // ─── Upload ─────────────────────────────────────────────────────────────────
 
-app.post("/api/upload", authMiddleware, upload.single("image"), (req, res) => {
+app.post("/api/upload", authMiddleware, upload.single("image"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    const db = await connectDB();
+    const content = await db.collection("siteSettings").findOne({ type: "main" }) || getDefaultContent();
+    const integration = content.integrations?.cloudinary || {};
+    const cloudName = integration.cloudName || process.env.CLOUDINARY_CLOUD_NAME;
+    if (integration.enabled && cloudName && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET && cloudName !== "demo") {
+      cloudinary.config({ cloud_name: cloudName, api_key: process.env.CLOUDINARY_API_KEY, api_secret: process.env.CLOUDINARY_API_SECRET });
+      const options = { folder: integration.folder || "softy-portfolio", resource_type: "image" };
+      if (integration.uploadPreset) options.upload_preset = integration.uploadPreset;
+      const result = await new Promise((resolve, reject) => { const stream = cloudinary.uploader.upload_stream(options, (error, value) => error ? reject(error) : resolve(value)); stream.end(req.file.buffer); });
+      return res.json({ url: result.secure_url, publicId: result.public_id });
+    }
     const base64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
     res.json({ url: base64 });
   } catch (err) {
@@ -211,7 +223,7 @@ app.post("/api/upload", authMiddleware, upload.single("image"), (req, res) => {
 app.get("/api/products", async (req, res) => {
   try {
     const db = await connectDB();
-    const filter = {};
+    const filter = { isActive: { $ne: false } };
     if (req.query.brandId) filter.brandId = req.query.brandId;
     if (req.query.categoryId) filter.categoryId = req.query.categoryId;
     const products = await db
@@ -303,9 +315,14 @@ app.delete("/api/products/:id", authMiddleware, async (req, res) => {
 app.get("/api/brands", async (req, res) => {
   try {
     const db = await connectDB();
+    const activeProducts = await db.collection("products")
+      .find({ isActive: { $ne: false } }, { projection: { brandId: 1 } })
+      .toArray();
+    const brandIds = [...new Set(activeProducts.map((product) => product.brandId).filter(ObjectId.isValid))]
+      .map((id) => new ObjectId(id));
     const brands = await db
       .collection("brands")
-      .find()
+      .find({ _id: { $in: brandIds } })
       .sort({ order: 1 })
       .toArray();
     res.json(brands);
@@ -371,9 +388,14 @@ app.delete("/api/brands/:id", authMiddleware, async (req, res) => {
 app.get("/api/categories", async (req, res) => {
   try {
     const db = await connectDB();
+    const activeProducts = await db.collection("products")
+      .find({ isActive: { $ne: false } }, { projection: { categoryId: 1 } })
+      .toArray();
+    const categoryIds = [...new Set(activeProducts.map((product) => product.categoryId).filter(ObjectId.isValid))]
+      .map((id) => new ObjectId(id));
     const categories = await db
       .collection("categories")
-      .find()
+      .find({ _id: { $in: categoryIds } })
       .sort({ order: 1 })
       .toArray();
     res.json(categories);
@@ -439,6 +461,12 @@ app.delete("/api/categories/:id", authMiddleware, async (req, res) => {
 function getDefaultContent() {
   return {
     type: "main",
+    integrations: {
+      googleAnalytics: { enabled: Boolean(process.env.GA_MEASUREMENT_ID || process.env.GOOGLE_ANALYTICS_ID), measurementId: process.env.GA_MEASUREMENT_ID || process.env.GOOGLE_ANALYTICS_ID || "" },
+      facebookPixel: { enabled: Boolean(process.env.FACEBOOK_PIXEL_ID), pixelId: process.env.FACEBOOK_PIXEL_ID || "" },
+      cloudinary: { enabled: true, cloudName: process.env.CLOUDINARY_CLOUD_NAME || "", uploadPreset: process.env.CLOUDINARY_UPLOAD_PRESET || "", folder: process.env.CLOUDINARY_FOLDER || "softy-portfolio" },
+    },
+    emailSettings: { enabled: true, forwardingEnabled: true, forwardingEmail: process.env.ORDER_FORWARDING_EMAIL || process.env.GMAIL_USER || "", senderName: process.env.EMAIL_SENDER_NAME || "Global Cosmetics Lines", replyTo: process.env.EMAIL_REPLY_TO || "" },
     hero: {
       eyebrow: "Global Cosmetics Lines - care made close to home",
       title: "Care that feels",
@@ -598,6 +626,8 @@ async function seedData(db) {
       .findOne({ type: "main" });
     if (!existingContent) {
       await db.collection("siteSettings").insertOne(getDefaultContent());
+    } else if (!existingContent.integrations || !existingContent.emailSettings) {
+      await db.collection("siteSettings").updateOne({ type: "main" }, { $set: { integrations: existingContent.integrations || getDefaultContent().integrations, emailSettings: existingContent.emailSettings || getDefaultContent().emailSettings } });
     }
 
     const existingBrands = await db.collection("brands").countDocuments();
