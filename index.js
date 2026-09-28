@@ -9,12 +9,18 @@ const jwt = require("jsonwebtoken");
 const multer = require("multer");
 const cloudinary = require("cloudinary").v2;
 const sharp = require("sharp");
+const crypto = require("crypto");
 try {
   require("dotenv").config();
 } catch (e) {}
 
 const app = express();
 const JWT_SECRET = process.env.JWT_SECRET || "adornica-secret-key-2026";
+const cloudinaryKey = crypto.createHash("sha256").update(process.env.JWT_SECRET || "softy-portfolio-cloudinary-settings-key").digest();
+const encryptCloudinarySecret = (value) => { if (!value) return ""; const iv = crypto.randomBytes(12); const cipher = crypto.createCipheriv("aes-256-gcm", cloudinaryKey, iv); const encrypted = Buffer.concat([cipher.update(String(value), "utf8"), cipher.final()]); return `enc:${iv.toString("base64")}:${cipher.getAuthTag().toString("base64")}:${encrypted.toString("base64")}`; };
+const decryptCloudinarySecret = (value) => { if (!value) return process.env.CLOUDINARY_API_SECRET || ""; if (!String(value).startsWith("enc:")) return String(value); try { const [, iv, tag, data] = String(value).split(":"); const decipher = crypto.createDecipheriv("aes-256-gcm", cloudinaryKey, Buffer.from(iv, "base64")); decipher.setAuthTag(Buffer.from(tag, "base64")); return Buffer.concat([decipher.update(Buffer.from(data, "base64")), decipher.final()]).toString("utf8"); } catch { return ""; } };
+const publicContent = (content) => { const value = { ...content, integrations: { ...(content.integrations || {}), cloudinary: { ...(content.integrations?.cloudinary || {}) } } }; const cloudinarySettings = value.integrations.cloudinary; cloudinarySettings.credentialsConfigured = Boolean(cloudinarySettings.apiKey && cloudinarySettings.apiSecret) || Boolean(process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET); cloudinarySettings.apiKey = ""; cloudinarySettings.apiSecret = ""; return value; };
+const cloudinarySettingsForSave = (input = {}, existing = {}) => ({ ...input, apiKey: String(input.apiKey || "").trim() || existing.apiKey || process.env.CLOUDINARY_API_KEY || "", apiSecret: String(input.apiSecret || "").trim() ? encryptCloudinarySecret(input.apiSecret) : (existing.apiSecret || process.env.CLOUDINARY_API_SECRET || "") });
 const MONGO_URI =
   process.env.MONGO_URI ||
   "mongodb://192.168.0.59:27017/softy-portfolio";
@@ -150,7 +156,7 @@ app.get("/api/content", async (req, res) => {
     const content = await db
       .collection("siteSettings")
       .findOne({ type: "main" });
-    res.json(content || getDefaultContent());
+    res.json(publicContent(content || getDefaultContent()));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -162,7 +168,7 @@ app.get("/api/content/:section", async (req, res) => {
     const content = await db
       .collection("siteSettings")
       .findOne({ type: "main" });
-    const data = content || getDefaultContent();
+    const data = publicContent(content || getDefaultContent());
     if (!data[req.params.section])
       return res.status(404).json({ error: "Section not found" });
     res.json(data[req.params.section]);
@@ -177,10 +183,19 @@ app.put("/api/content", authMiddleware, async (req, res) => {
     const existing = await db
       .collection("siteSettings")
       .findOne({ type: "main" });
+    const defaults = getDefaultContent();
+    const requestedIntegrations = req.body.integrations || {};
+    const existingIntegrations = existing?.integrations || {};
     const updated = {
-      ...getDefaultContent(),
+      ...defaults,
       ...(existing || {}),
       ...req.body,
+      integrations: {
+        ...defaults.integrations,
+        ...existingIntegrations,
+        ...requestedIntegrations,
+        cloudinary: cloudinarySettingsForSave(requestedIntegrations.cloudinary || {}, existingIntegrations.cloudinary || {}),
+      },
       type: "main",
     };
     if (existing) {
@@ -190,7 +205,7 @@ app.put("/api/content", authMiddleware, async (req, res) => {
     } else {
       await db.collection("siteSettings").insertOne(updated);
     }
-    res.json(updated);
+    res.json(publicContent(updated));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -217,8 +232,10 @@ app.post("/api/upload", authMiddleware, upload.single("image"), async (req, res)
     const content = await db.collection("siteSettings").findOne({ type: "main" }) || getDefaultContent();
     const integration = content.integrations?.cloudinary || {};
     const cloudName = integration.cloudName || process.env.CLOUDINARY_CLOUD_NAME;
-    if (integration.enabled && cloudName && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET && cloudName !== "demo") {
-      cloudinary.config({ cloud_name: cloudName, api_key: process.env.CLOUDINARY_API_KEY, api_secret: process.env.CLOUDINARY_API_SECRET });
+    const apiKey = integration.apiKey || process.env.CLOUDINARY_API_KEY;
+    const apiSecret = decryptCloudinarySecret(integration.apiSecret);
+    if (integration.enabled && cloudName && apiKey && apiSecret && cloudName !== "demo") {
+      cloudinary.config({ cloud_name: cloudName, api_key: apiKey, api_secret: apiSecret });
       const optimizedBuffer = await optimizeCloudinaryImage(req.file);
       const options = { folder: integration.folder || "softy-portfolio", resource_type: "image", format: "webp" };
       if (integration.uploadPreset) options.upload_preset = integration.uploadPreset;
