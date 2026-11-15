@@ -38,6 +38,7 @@ async function connectDB() {
   await cachedDb.collection("products").createIndex({ order: 1 });
   await cachedDb.collection("brands").createIndex({ slug: 1 }, { unique: true });
   await cachedDb.collection("categories").createIndex({ slug: 1 }, { unique: true });
+  await cachedDb.collection("blogs").createIndex({ slug: 1 }, { unique: true });
   return cachedDb;
 }
 
@@ -209,6 +210,27 @@ app.put("/api/content", authMiddleware, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// ─── Blog ───────────────────────────────────────────────────────────────────
+const blogSlug = (value) => String(value || "").toLowerCase().trim().replace(/[^a-z0-9\s-]/g, "").replace(/[\s-]+/g, "-").replace(/^-|-$/g, "");
+app.get("/api/blogs", async (req, res) => {
+  try { const blogs = await (await connectDB()).collection("blogs").find({ isPublished: { $ne: false } }).sort({ publishedAt: -1, createdAt: -1 }).toArray(); res.json({ blogs }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.get("/api/blogs/:slug", async (req, res) => {
+  try { const blog = await (await connectDB()).collection("blogs").findOne({ slug: req.params.slug, isPublished: { $ne: false } }); if (!blog) return res.status(404).json({ error: "Post not found" }); res.json({ blog }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.get("/api/admin/blogs", authMiddleware, async (req, res) => {
+  try { res.json({ blogs: await (await connectDB()).collection("blogs").find({}).sort({ updatedAt: -1, createdAt: -1 }).toArray() }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post("/api/admin/blogs", authMiddleware, async (req, res) => {
+  try { const { title, excerpt = "", content = "", image = "", isPublished = false } = req.body; if (!String(title || "").trim()) return res.status(400).json({ error: "Title required" }); const now = new Date(); const published = isPublished === true || isPublished === "true"; const blog = { title: String(title).trim(), slug: blogSlug(req.body.slug || title), excerpt: String(excerpt).trim(), content: String(content), image: String(image).trim(), isPublished: published, publishedAt: published ? now : null, createdAt: now, updatedAt: now }; const result = await (await connectDB()).collection("blogs").insertOne(blog); res.status(201).json({ blog: { ...blog, _id: result.insertedId } }); } catch (err) { res.status(500).json({ error: err.code === 11000 ? "A post with this slug already exists" : err.message }); }
+});
+app.put("/api/admin/blogs/:id", authMiddleware, async (req, res) => {
+  try { if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: "Invalid post ID" }); const update = { ...req.body, updatedAt: new Date() }; delete update._id; if (update.title) { update.title = String(update.title).trim(); update.slug = blogSlug(update.slug || update.title); } if ("isPublished" in update) update.isPublished = update.isPublished === true || update.isPublished === "true"; await (await connectDB()).collection("blogs").updateOne({ _id: new ObjectId(req.params.id) }, { $set: update }); res.json({ success: true }); } catch (err) { res.status(500).json({ error: err.code === 11000 ? "A post with this slug already exists" : err.message }); }
+});
+app.delete("/api/admin/blogs/:id", authMiddleware, async (req, res) => {
+  try { if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: "Invalid post ID" }); await (await connectDB()).collection("blogs").deleteOne({ _id: new ObjectId(req.params.id) }); res.json({ success: true }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ─── Upload ─────────────────────────────────────────────────────────────────
