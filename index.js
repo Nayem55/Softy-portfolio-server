@@ -680,8 +680,8 @@ async function seedData(db) {
       .findOne({ type: "main" });
     if (!existingContent) {
       await db.collection("siteSettings").insertOne(getDefaultContent());
-    } else if (!existingContent.integrations || !existingContent.emailSettings) {
-      await db.collection("siteSettings").updateOne({ type: "main" }, { $set: { integrations: existingContent.integrations || getDefaultContent().integrations, emailSettings: existingContent.emailSettings || getDefaultContent().emailSettings } });
+    } else if (!existingContent.integrations || !existingContent.emailSettings || !existingContent.gallery) {
+      await db.collection("siteSettings").updateOne({ type: "main" }, { $set: { integrations: existingContent.integrations || getDefaultContent().integrations, emailSettings: existingContent.emailSettings || getDefaultContent().emailSettings, gallery: existingContent.gallery || getDefaultContent().gallery } });
     }
 
     const existingBrands = await db.collection("brands").countDocuments();
