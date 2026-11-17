@@ -541,6 +541,7 @@ function getDefaultContent() {
         { label: "Support you can reach", sublabel: "" },
       ],
     },
+    gallery: { eyebrow: "The collection in focus", title: "Product gallery", description: "A closer look at the products, textures, and everyday rituals behind Global Cosmetics Lines.", items: [] },
     marquee: {
       items: [
         "Feel The Pure Softness",
